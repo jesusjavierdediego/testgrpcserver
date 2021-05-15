@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"github.com/mahendrabagul/devsecops-meetup/employee"
 	pb "github.com/mahendrabagul/devsecops-meetup/employee"
@@ -17,6 +19,9 @@ import (
 const (
 	port         = ":50051"
 	JsonFileName = "database/employees.json"
+	CertChain    = "grpc-root-ca-and-grpc-server-ca-and-grpc-client-ca-chain.crt"
+	ServerCert   = "grpc-server.crt"
+	ServerKey    = "grpc-server.key"
 )
 
 type server struct {
@@ -58,26 +63,52 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+	tc := getTlsConfig()
+	serverOption := grpc.Creds(credentials.NewTLS(tc))
+	s := grpc.NewServer(serverOption)
+	employee.RegisterEmployeeServiceServer(s, &server{})
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
 
+func getTlsConfig() *tls.Config {
+	parent := getParent()
+	certificate := getCertificate(parent)
+	certPool := getCertPool(parent)
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certPool,
+	}
+	return tlsConfig
+}
+
+func getCertPool(parent string) *x509.CertPool {
+	certPool := x509.NewCertPool()
+	bs, err := ioutil.ReadFile(filepath.Join(parent, "certificates", "certificatesChain", CertChain))
+	if err != nil {
+		log.Fatalf("failed to read certificates chain: %s", err)
+	}
+	ok := certPool.AppendCertsFromPEM(bs)
+	if !ok {
+		log.Fatalf("failed to append certs")
+	}
+	return certPool
+}
+
+func getCertificate(parent string) tls.Certificate {
+	crt := filepath.Join(parent, "certificates", "serverCertificates", ServerCert)
+	key := filepath.Join(parent, "certificates", "serverCertificates", ServerKey)
+	certificate, _ := tls.LoadX509KeyPair(crt, key)
+	return certificate
+}
+
+func getParent() string {
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("failed to get wd: %v", err)
 	}
 	parent := filepath.Dir(wd)
-	crt := filepath.Join(parent, "certificates", "serverCertificates", "grpc-server.crt")
-	key := filepath.Join(parent, "certificates", "serverCertificates", "grpc-server.key")
-
-	// Create the TLS credentials
-	creds, err := credentials.NewServerTLSFromFile(crt, key)
-	if err != nil {
-		log.Fatalf("could not load TLS keys: %s", err)
-	}
-
-	s := grpc.NewServer(grpc.Creds(creds))
-
-	employee.RegisterEmployeeServiceServer(s, &server{})
-
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	return parent
 }
