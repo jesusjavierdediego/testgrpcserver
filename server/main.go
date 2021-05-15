@@ -6,10 +6,12 @@ import (
 	"github.com/mahendrabagul/devsecops-meetup/employee"
 	pb "github.com/mahendrabagul/devsecops-meetup/employee"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -56,8 +58,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("failed to get wd: %v", err)
+	}
+	parent := filepath.Dir(wd)
+	crt := filepath.Join(parent, "certificates", "serverCertificates", "grpc-server.crt")
+	key := filepath.Join(parent, "certificates", "serverCertificates", "grpc-server.key")
+
+	// Create the TLS credentials
+	creds, err := credentials.NewServerTLSFromFile(crt, key)
+	if err != nil {
+		log.Fatalf("could not load TLS keys: %s", err)
+	}
+
+	s := grpc.NewServer(grpc.Creds(creds))
+
 	employee.RegisterEmployeeServiceServer(s, &server{})
+
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
