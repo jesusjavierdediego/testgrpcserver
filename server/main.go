@@ -8,7 +8,10 @@ import (
 	"github.com/mahendrabagul/devsecops-meetup/employee"
 	pb "github.com/mahendrabagul/devsecops-meetup/employee"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"log"
 	"net"
@@ -29,9 +32,46 @@ type server struct {
 }
 
 // GetDetails implements employee.GetDetails
-func (s *server) GetDetails(_ context.Context, in *pb.EmployeeRequest) (*pb.EmployeeResponse, error) {
+func (s *server) GetDetails(ctx context.Context, in *pb.EmployeeRequest) (*pb.EmployeeResponse, error) {
+	err, invalid := isInvalidCertificate(ctx)
+	if invalid {
+		return nil, err
+	}
 	e := s.getEmployeeDetails(in.GetId())
 	return &pb.EmployeeResponse{Message: e}, nil
+}
+
+func isInvalidCertificate(ctx context.Context) (error, bool) {
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		err := status.Error(codes.Unauthenticated, "no peer found")
+		return err, true
+	}
+	tlsAuth, ok := p.AuthInfo.(credentials.TLSInfo)
+	if !ok {
+		err := status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
+		return err, true
+	}
+	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
+		err := status.Error(codes.Unauthenticated, "could not verify peer certificate")
+		return err, true
+	}
+	// Check subject common name against configured username
+	if !contains(tlsAuth.State.VerifiedChains[0][0].Subject.CommonName) {
+		err := status.Error(codes.Unauthenticated, "invalid subject common name : Unauthenticated Client")
+		return err, true
+	}
+	return nil, false
+}
+
+func contains(e string) bool {
+	var validClients = []string{"node-grpc-client1", "node-grpc-client2", "node-grpc-client3"}
+	for _, a := range validClients {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *server) getEmployeeDetails(id int32) *pb.EmployeeDetails {
