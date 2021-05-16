@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: devsecops-meetup
+  name: golang-grpc-server
+  labels:
+    app: golang-grpc-server
+spec:
+  selector:
+    matchLabels:
+      app: golang-grpc-server
+  template:
+    metadata:
+      labels:
+        app: golang-grpc-server
+        name: golang-grpc-server
+    spec:
+      containers:
+        - name: golang-grpc-server
+          image: mahendrabagul/golang-grpc-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: golang-grpc-config
+                  key: SERVER_PORT
+            - name: EMPLOYEES
+              valueFrom:
+                configMapKeyRef:
+                  name: employee-database
+                  key: EMPLOYEES
+          ports:
+            - containerPort: 50051
+              name: grpc
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          volumeMounts:
+            - name: grpc-server-certificates
+              mountPath: /app/Certs/
+              readOnly: true
+      volumes:
+        - name: grpc-server-certificates
+          secret:
+            secretName: grpc-server-certificates

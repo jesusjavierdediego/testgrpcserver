@@ -41,3 +41,8 @@ Add a check for verifying client certificates in golang-grpc-server with mTLS se
 - Show `main.go` file and compare current changes with the earlier commit
 
 ---
+Sixth Demo :
+---
+Deploy golang-grpc-server on KinD-based kubernetes cluster behind secured nginx ingress and unload the tls at pod level.
+
+- Check `main.go` file, Dockerfile and `kubernetes` folder

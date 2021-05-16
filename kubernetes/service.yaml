@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: devsecops-meetup
+  labels:
+    app: golang-grpc-server
+  name: golang-grpc-server
+spec:
+  ports:
+  - port: 50051
+    targetPort: grpc
+    protocol: TCP
+    nodePort: 30101
+  selector:
+    app: golang-grpc-server
+  type: NodePort
