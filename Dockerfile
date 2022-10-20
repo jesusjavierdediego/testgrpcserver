@@ -1,24 +1,17 @@
-FROM golang:1.16.4-alpine3.13 as build-env
+FROM golang:alpine as golang
+RUN apk add --no-cache git
+WORKDIR $GOPATH/src/xqledger/grpcserver
+COPY . ./
+RUN CGO_ENABLED=0 go install -ldflags '-extldflags "-static"'
 
-MAINTAINER mahendrabagul <bagulm123@gmail.com>
-
-ENV GO111MODULE=on
-
-WORKDIR /app
-
-RUN apk add --update --no-cache ca-certificates git
-
-COPY go.mod .
-COPY go.sum .
-
-RUN go mod download
-
-COPY . .
-
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o /go/bin/golang-grpc-server server/main.go
+FROM alpine:latest as alpine
+RUN apk --no-cache add tzdata zip ca-certificates
+WORKDIR /usr/share/zoneinfo
+RUN zip -r -0 /zoneinfo.zip .
 
 FROM scratch
-COPY --from=build-env /go/bin/golang-grpc-server /app/golang-grpc-server
-EXPOSE 50051
-ENTRYPOINT ["/app/golang-grpc-server"]
+COPY --from=golang /go/bin/grpcserver /app
+ENV ZONEINFO /zoneinfo.zip
+COPY --from=alpine /zoneinfo.zip /
+COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+ENTRYPOINT ["/app"]

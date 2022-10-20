@@ -1,8 +1,9 @@
-module github.com/mahendrabagul/devsecops-meetup
+module xqledger/grpcserver
 
-go 1.16
+go 1.15
 
 require (
-	google.golang.org/grpc v1.37.1
-	google.golang.org/protobuf v1.26.0
+	golang.org/x/net v0.0.0-20211111160137-58aab5ef257a
+	google.golang.org/grpc v1.42.0
+	google.golang.org/protobuf v1.27.1
 )
